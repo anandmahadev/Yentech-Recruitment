@@ -75,6 +75,9 @@ interface FormData {
   experience: string
 }
 
+// Store submitted campus IDs to prevent duplicates (in production, this would be in a database)
+const submittedCampusIds = new Set<string>()
+
 export function RecruitmentForm() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>({
@@ -89,12 +92,17 @@ export function RecruitmentForm() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
   const [applicationId, setApplicationId] = useState("")
+  
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
     if (!formData.fullName.trim()) newErrors.fullName = "Name is required"
     if (!/^\d{10}$/.test(formData.mobile)) newErrors.mobile = "Enter valid 10-digit mobile number"
-    if (!formData.campusId.trim()) newErrors.campusId = "Campus ID is required"
+    if (!formData.campusId.trim()) {
+      newErrors.campusId = "Campus ID is required"
+    } else if (submittedCampusIds.has(formData.campusId.trim().toUpperCase())) {
+      newErrors.campusId = "This Campus ID has already submitted an application"
+    }
     if (!formData.domain) newErrors.domain = "Select a domain"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -126,6 +134,17 @@ export function RecruitmentForm() {
   }
 
   const handleSubmit = () => {
+    // Check for duplicate campus ID one more time before final submission
+    const normalizedCampusId = formData.campusId.trim().toUpperCase()
+    if (submittedCampusIds.has(normalizedCampusId)) {
+      setStep(1)
+      setErrors({ campusId: "This Campus ID has already submitted an application" })
+      return
+    }
+    
+    // Store the campus ID to prevent future duplicates
+    submittedCampusIds.add(normalizedCampusId)
+    
     const id = `YT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
     setApplicationId(id)
     setSubmitted(true)
@@ -163,14 +182,13 @@ export function RecruitmentForm() {
         <p className="text-muted-foreground mb-8 font-mono">
           Welcome to the crew. We&apos;ll be in touch soon.
         </p>
-        <div className="inline-block bg-card border border-border rounded-lg p-6 mb-6">
+        <div className="inline-block bg-card border border-border rounded-lg p-6">
           <p className="text-sm text-muted-foreground mb-2">Your Application ID</p>
           <p className="text-2xl font-mono font-bold text-[#00d4ff]">{applicationId}</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4 inline-block">
-          <p className="text-sm text-muted-foreground mb-1">Assessment Score</p>
-          <p className="text-xl font-mono font-bold text-foreground">{calculateScore()}/5</p>
-        </div>
+        <p className="text-sm text-muted-foreground mt-6 font-mono">
+          Save this ID for future reference
+        </p>
       </motion.div>
     )
   }
