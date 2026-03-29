@@ -40,48 +40,6 @@ const situationalQuestions = [
     placeholder: "Describe how you would adapt..."
   }
 ]
-  },
-  {
-    id: 2,
-    question: "You&apos;ve been assigned a task using a technology you&apos;ve never worked with before, and the deadline is tight. What&apos;s your approach?",
-    options: [
-      "Tell your lead you can&apos;t do it and ask for a different assignment",
-      "Research the basics, start building, and ask for help when truly stuck",
-      "Wait until the last minute hoping someone else takes over",
-      "Copy code from the internet without understanding it"
-    ]
-  },
-  {
-    id: 3,
-    question: "During a club event, you notice a junior member struggling but hesitant to ask for help. What do you do?",
-    options: [
-      "Ignore it - they need to learn to speak up",
-      "Approach them casually, offer assistance without making them feel embarrassed",
-      "Announce to everyone that someone needs help",
-      "Complete their task for them quickly"
-    ]
-  },
-  {
-    id: 4,
-    question: "You strongly disagree with a decision made by the club leadership about an upcoming project. How do you respond?",
-    options: [
-      "Publicly criticize the decision on social media or group chats",
-      "Express your concerns respectfully with alternative suggestions in a proper forum",
-      "Silently comply but complain to other members privately",
-      "Refuse to participate in the project"
-    ]
-  },
-  {
-    id: 5,
-    question: "You&apos;re leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What&apos;s your move?",
-    options: [
-      "Continue as planned - they should catch up",
-      "Adapt on the spot, simplify concepts, and check understanding frequently",
-      "End the workshop early since it&apos;s not working",
-      "Blame the organizers for not filtering attendees properly"
-    ]
-  }
-]
 
 interface FormData {
   fullName: string
