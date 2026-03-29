@@ -16,13 +16,30 @@ const domains = [
 const situationalQuestions = [
   {
     id: 1,
-    question: "You&apos;re working on a team project and a member consistently misses deadlines, affecting everyone&apos;s work. How do you handle this?",
-    options: [
-      "Directly confront them in front of the team to address the issue publicly",
-      "Have a private conversation to understand their challenges and offer support",
-      "Report them immediately to the project lead without discussion",
-      "Take over their tasks yourself to avoid conflict"
-    ]
+    question: "You're working on a team project and a member consistently misses deadlines, affecting everyone's work. How do you handle this?",
+    placeholder: "Describe how you would approach this situation..."
+  },
+  {
+    id: 2,
+    question: "You've been assigned a task using a technology you've never worked with before, and the deadline is tight. What's your approach?",
+    placeholder: "Explain your strategy for learning and delivering..."
+  },
+  {
+    id: 3,
+    question: "During a club event, you notice a junior member struggling but hesitant to ask for help. What do you do?",
+    placeholder: "Describe how you would support them..."
+  },
+  {
+    id: 4,
+    question: "You strongly disagree with a decision made by the club leadership about an upcoming project. How do you respond?",
+    placeholder: "Explain how you would handle this disagreement..."
+  },
+  {
+    id: 5,
+    question: "You're leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What's your move?",
+    placeholder: "Describe how you would adapt..."
+  }
+]
   },
   {
     id: 2,
@@ -71,7 +88,7 @@ interface FormData {
   mobile: string
   campusId: string
   domain: string
-  answers: Record<number, number>
+  answers: Record<number, string>
   whyChooseYou: string
   experience: string
 }
@@ -121,9 +138,15 @@ export function RecruitmentForm() {
   }
 
   const validateStep2 = () => {
-    const answered = Object.keys(formData.answers).length
-    if (answered < 5) {
-      setErrors({ questions: "Please answer all questions" })
+    const newErrors: Record<string, string> = {}
+    situationalQuestions.forEach((q) => {
+      const answer = formData.answers[q.id]?.trim()
+      if (!answer || answer.length < 20) {
+        newErrors[`q${q.id}`] = "Please provide a meaningful answer (min 20 characters)"
+      }
+    })
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
       return false
     }
     setErrors({})
@@ -186,14 +209,7 @@ export function RecruitmentForm() {
     setSubmitted(true)
   }
 
-  const calculateScore = () => {
-    const correctAnswers: Record<number, number> = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }
-    let score = 0
-    Object.entries(formData.answers).forEach(([q, a]) => {
-      if (correctAnswers[parseInt(q)] === a) score++
-    })
-    return score
-  }
+  
 
   const progressWidth = `${(step / 3) * 100}%`
 
@@ -357,37 +373,33 @@ export function RecruitmentForm() {
               </div>
             </div>
 
-            {errors.questions && (
-              <p className="text-destructive text-sm font-mono bg-destructive/10 p-3 rounded-lg">{errors.questions}</p>
-            )}
-
             <div className="space-y-6">
               {situationalQuestions.map((q, qIndex) => (
                 <div key={q.id} className="bg-card border border-border rounded-lg p-5">
                   <p className="text-foreground font-mono text-sm mb-4 leading-relaxed">
                     <span className="text-[#00d4ff] font-bold">Q{qIndex + 1}.</span>{" "}
-                    {q.question.replace(/&apos;/g, "'")}
+                    {q.question}
                   </p>
-                  <div className="space-y-2">
-                    {q.options.map((option, oIndex) => (
-                      <button
-                        key={oIndex}
-                        type="button"
-                        onClick={() => setFormData({
-                          ...formData,
-                          answers: { ...formData.answers, [q.id]: oIndex }
-                        })}
-                        className={cn(
-                          "w-full text-left p-3 rounded-lg border transition-all duration-200 font-mono text-sm",
-                          formData.answers[q.id] === oIndex
-                            ? "border-[#00d4ff] bg-[#00d4ff]/10 text-foreground"
-                            : "border-border bg-secondary/50 text-muted-foreground hover:border-[#00d4ff]/50 hover:text-foreground"
-                        )}
-                      >
-                        <span className="text-[#00d4ff] mr-2">{String.fromCharCode(65 + oIndex)}.</span>
-                        {option.replace(/&apos;/g, "'")}
-                      </button>
-                    ))}
+                  <textarea
+                    value={formData.answers[q.id] || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      answers: { ...formData.answers, [q.id]: e.target.value }
+                    })}
+                    rows={3}
+                    className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono text-sm transition-all resize-none"
+                    placeholder={q.placeholder}
+                  />
+                  <div className="flex justify-between mt-2">
+                    {errors[`q${q.id}`] && (
+                      <p className="text-destructive text-xs font-mono">{errors[`q${q.id}`]}</p>
+                    )}
+                    <p className={cn(
+                      "text-xs font-mono ml-auto",
+                      (formData.answers[q.id]?.length || 0) >= 20 ? "text-[#10b981]" : "text-muted-foreground"
+                    )}>
+                      {formData.answers[q.id]?.length || 0}/20 min
+                    </p>
                   </div>
                 </div>
               ))}
