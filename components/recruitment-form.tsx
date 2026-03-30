@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronRight, ChevronLeft, User, Brain, MessageSquare, CheckCircle, Zap, Code, Terminal, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -52,7 +52,13 @@ interface FormData {
 }
 
 export function RecruitmentForm() {
+  const [isMounted, setIsMounted] = useState(false)
   const [step, setStep] = useState(1)
+  
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+  
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     mobile: "",
@@ -68,6 +74,7 @@ export function RecruitmentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingCampusId, setIsCheckingCampusId] = useState(false)
   
+  if (!isMounted) return null
 
   const validateStep1 = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {}
@@ -78,16 +85,22 @@ export function RecruitmentForm() {
     } else {
       // Check if campus ID already exists in database
       setIsCheckingCampusId(true)
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("registrations")
-        .select("campus_id")
-        .eq("campus_id", formData.campusId.trim().toUpperCase())
-        .single()
-      setIsCheckingCampusId(false)
-      
-      if (data) {
-        newErrors.campusId = "This Campus ID has already submitted an application"
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from("registrations")
+          .select("campus_id")
+          .eq("campus_id", formData.campusId.trim().toUpperCase())
+          .single()
+        
+        if (data) {
+          newErrors.campusId = "This Campus ID has already submitted an application"
+        }
+      } catch (error) {
+        console.warn("Database connection error: Configuration missing or connection failed.")
+        newErrors.campusId = "Database configuration missing or connection failed."
+      } finally {
+        setIsCheckingCampusId(false)
       }
     }
     if (!formData.domain) newErrors.domain = "Select a domain"
@@ -133,38 +146,44 @@ export function RecruitmentForm() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    const supabase = createClient()
-    const normalizedCampusId = formData.campusId.trim().toUpperCase()
-    const id = `YT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
     
-    // Insert registration into database
-    const { error } = await supabase.from("registrations").insert({
-      application_id: id,
-      campus_id: normalizedCampusId,
-      full_name: formData.fullName.trim(),
-      mobile: formData.mobile,
-      domain: formData.domain,
-      answers: formData.answers,
-      why_choose_you: formData.whyChooseYou.trim(),
-      experience: formData.experience.trim() || null
-    })
-    
-    setIsSubmitting(false)
-    
-    if (error) {
-      // Check if it's a duplicate campus_id error
-      if (error.code === "23505") {
-        setStep(1)
-        setErrors({ campusId: "This Campus ID has already submitted an application" })
+    try {
+      const supabase = createClient()
+      const normalizedCampusId = formData.campusId.trim().toUpperCase()
+      const id = `YT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      
+      // Insert registration into database
+      const { error } = await supabase.from("registrations").insert({
+        application_id: id,
+        campus_id: normalizedCampusId,
+        full_name: formData.fullName.trim(),
+        mobile: formData.mobile,
+        domain: formData.domain,
+        answers: formData.answers,
+        why_choose_you: formData.whyChooseYou.trim(),
+        experience: formData.experience.trim() || null
+      })
+      
+      if (error) {
+        // Check if it's a duplicate campus_id error
+        if (error.code === "23505") {
+          setStep(1)
+          setErrors({ campusId: "This Campus ID has already submitted an application" })
+          return
+        }
+        // Handle other errors
+        setErrors({ submit: "Something went wrong. Please try again." })
         return
       }
-      // Handle other errors
-      setErrors({ submit: "Something went wrong. Please try again." })
-      return
+      
+      setApplicationId(id)
+      setSubmitted(true)
+    } catch (error) {
+      console.warn("Submission error: Configuration missing or connection failed.")
+      setErrors({ submit: "Database configuration missing or connection failed." })
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    setApplicationId(id)
-    setSubmitted(true)
   }
 
   
