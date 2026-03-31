@@ -156,22 +156,37 @@ export function RecruitmentForm() {
 
   const validateStep1 = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {}
+
     if (!formData.fullName.trim()) newErrors.fullName = "Name is required"
-    if (!/^\d{10}$/.test(formData.mobile))
-      newErrors.mobile = "Enter valid 10-digit mobile number"
-    if (!formData.campusId.trim()) {
-      newErrors.campusId = "Campus ID is required"
-    } else {
+
+    const mobileValid = /^\d{10}$/.test(formData.mobile)
+    if (!mobileValid) newErrors.mobile = "Enter valid 10-digit mobile number"
+
+    if (!formData.campusId.trim()) newErrors.campusId = "Campus ID is required"
+    if (!formData.domain) newErrors.domain = "Select a domain"
+
+    // Only hit the DB if both mobile and campus ID look valid (saves unnecessary queries)
+    if (mobileValid && formData.campusId.trim()) {
       setIsCheckingCampusId(true)
       try {
         const supabase = createClient()
-        const { data } = await supabase
-          .from("registrations")
-          .select("campus_id")
-          .eq("campus_id", formData.campusId.trim().toUpperCase())
-          .single()
-        if (data) {
+        const [campusCheck, mobileCheck] = await Promise.all([
+          supabase
+            .from("registrations")
+            .select("campus_id")
+            .eq("campus_id", formData.campusId.trim().toUpperCase())
+            .maybeSingle(),
+          supabase
+            .from("registrations")
+            .select("mobile")
+            .eq("mobile", formData.mobile)
+            .maybeSingle(),
+        ])
+        if (campusCheck.data) {
           newErrors.campusId = "This Campus ID has already submitted an application"
+        }
+        if (mobileCheck.data) {
+          newErrors.mobile = "This mobile number has already been used to apply"
         }
       } catch {
         console.warn("Database connection error: Configuration missing or connection failed.")
@@ -179,7 +194,7 @@ export function RecruitmentForm() {
         setIsCheckingCampusId(false)
       }
     }
-    if (!formData.domain) newErrors.domain = "Select a domain"
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
