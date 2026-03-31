@@ -41,7 +41,8 @@ interface Registration {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "yentech2026"
+// const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "yentech2026"
+import { adminLoginAction, adminLogoutAction, getAdminSessionAction, getRegistrationsAction } from "@/app/actions/auth-actions"
 
 const DOMAIN_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   "ai-ml": { label: "AI / ML", icon: Brain, color: "#7c3aed" },
@@ -78,19 +79,23 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    setTimeout(() => {
-      if (password === ADMIN_PASSWORD) {
+    try {
+      const res = await adminLoginAction(password)
+      if (res.success) {
         onSuccess()
       } else {
-        setError("Incorrect password. Access denied.")
-        setIsLoading(false)
+        setError(res.error || "Incorrect password. Access denied.")
       }
-    }, 600)
+    } catch {
+      setError("An error occurred during login. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -375,17 +380,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setIsLoading(true)
     setError(null)
     try {
-      const supabase = createClient()
-      const { data, error: dbError } = await supabase
-        .from("registrations")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (dbError) throw dbError
+      const data = await getRegistrationsAction()
       setRegistrations(data ?? [])
     } catch (err) {
-      console.warn("Admin fetch error:", err)
-      setError("Failed to load registrations. Check your Supabase connection.")
+      console.error("Admin fetch error:", err)
+      setError("Failed to load registrations. Check your session or connection.")
     } finally {
       setIsLoading(false)
     }
@@ -563,18 +562,22 @@ export function AdminDashboard() {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
-    const stored = sessionStorage.getItem("yentech-admin-auth")
-    if (stored === "true") setIsAuthenticated(true)
+    async function checkSession() {
+      setIsMounted(true)
+      const session = await getAdminSessionAction()
+      if (session && session.admin) {
+        setIsAuthenticated(true)
+      }
+    }
+    checkSession()
   }, [])
 
   const handleLogin = () => {
-    sessionStorage.setItem("yentech-admin-auth", "true")
     setIsAuthenticated(true)
   }
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("yentech-admin-auth")
+  const handleLogout = async () => {
+    await adminLogoutAction()
     setIsAuthenticated(false)
   }
 

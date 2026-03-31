@@ -3,6 +3,7 @@ import { Cpu, Lock } from "lucide-react"
 import Link from "next/link"
 
 export default function Home() {
+  console.log("Rending Home Page")
   return (
     <main className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Grid Background */}

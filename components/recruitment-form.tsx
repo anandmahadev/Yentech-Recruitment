@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { submitRecruitmentFormAction } from "@/app/actions/form-actions"
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
 
@@ -349,37 +350,37 @@ export function RecruitmentForm() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
+    setErrors({})
+    
     try {
-      const supabase = createClient()
-      const normalizedCampusId = formData.campusId.trim().toUpperCase()
-      const id = `YT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-
-      const { error } = await supabase.from("registrations").insert({
-        application_id: id,
-        campus_id: normalizedCampusId,
-        full_name: formData.fullName.trim(),
+      // 1. Prepare data for server action
+      const submissionData = {
+        fullName: formData.fullName.trim(),
         mobile: formData.mobile,
+        campusId: formData.campusId.trim().toUpperCase(),
         domain: formData.domain,
-        answers: formData.answers,
-        why_choose_you: formData.whyChooseYou.trim(),
-        experience: formData.experience.trim() || null,
-      })
-
-      if (error) {
-        if (error.code === "23505") {
-          // Unique constraint — could be campus_id or could be mobile if we add that constraint
-          setStep(1)
-          setErrors({ campusId: "This Campus ID has already submitted an application" })
-          return
-        }
-        setErrors({ submit: "Something went wrong. Please try again." })
-        return
+        answers: Object.entries(formData.answers).reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {}),
+        whyChooseYou: formData.whyChooseYou.trim(),
+        experience: formData.experience.trim() || undefined,
       }
 
-      setApplicationId(id)
-      setSubmitted(true)
-    } catch {
-      console.warn("Submission error.")
+      // 2. Call the server action
+      const res = await submitRecruitmentFormAction(submissionData as any)
+
+      if (res.success) {
+        setApplicationId(res.applicationId!)
+        setSubmitted(true)
+      } else {
+        // Handle server-side errors
+        if (res.error?.includes("Campus ID") || res.error?.includes("Mobile")) {
+          setStep(1)
+          setErrors({ campusId: res.error, mobile: res.error })
+        } else {
+          setErrors({ submit: res.error || "Submission failed. Please try again." })
+        }
+      }
+    } catch (error) {
+      console.error("Submission error:", error)
       setErrors({ submit: "Connection failed. Please check your internet and try again." })
     } finally {
       setIsSubmitting(false)
