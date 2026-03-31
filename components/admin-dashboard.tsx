@@ -58,6 +58,18 @@ const SITUATIONAL_QUESTIONS = [
   "You're leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What's your move?",
 ]
 
+const DOMAIN_SPECIFIC_QUESTIONS: Record<string, string[]> = {
+  "web-dev": [
+    "What does HTML stand for, and what is its role in a webpage?",
+    "What is the difference between HTML, CSS, and JavaScript? Explain in your own words.",
+    "What is the difference between a frontend and a backend developer?",
+    "What does 'responsive design' mean?",
+    "You visit a website and the layout looks broken on your phone but fine on a laptop. What could be the reason?",
+    "Name any website you find visually appealing. What do you like about its design?",
+  ],
+}
+
+
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
@@ -297,15 +309,39 @@ function CandidateCard({ reg, index }: { reg: Registration; index: number }) {
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
                   Situational Answers
                 </p>
-                {answersArray.map(([key, answer], i) => (
-                  <div key={key} className="rounded-lg p-4" style={{ background: "#0f0f18", border: "1px solid rgba(39,39,42,0.6)" }}>
-                    <p className="text-xs font-medium mb-2" style={{ color: "#71717a" }}>
-                      Q{i + 1}. {SITUATIONAL_QUESTIONS[i] ?? `Question ${Number(key)}`}
-                    </p>
-                    <p className="text-sm text-white leading-relaxed">{answer || <span className="italic text-zinc-600">No answer</span>}</p>
-                  </div>
-                ))}
+                {answersArray
+                  .filter(([key]) => Number(key) < 100)
+                  .map(([key, answer], i) => (
+                    <div key={key} className="rounded-lg p-4" style={{ background: "#0f0f18", border: "1px solid rgba(39,39,42,0.6)" }}>
+                      <p className="text-xs font-medium mb-2" style={{ color: "#71717a" }}>
+                        Q{i + 1}. {SITUATIONAL_QUESTIONS[i] ?? `Question ${Number(key)}`}
+                      </p>
+                      <p className="text-sm text-white leading-relaxed">{answer || <span className="italic text-zinc-600">No answer</span>}</p>
+                    </div>
+                  ))}
               </div>
+
+              {/* Domain-Specific Answers */}
+              {answersArray.filter(([key]) => Number(key) >= 100).length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: domain.color }}>
+                    {domain.label} — Domain Questions
+                  </p>
+                  {answersArray
+                    .filter(([key]) => Number(key) >= 100)
+                    .map(([key, answer], i) => {
+                      const domainQList = DOMAIN_SPECIFIC_QUESTIONS[reg.domain] ?? []
+                      return (
+                        <div key={key} className="rounded-lg p-4" style={{ background: "#0f0f18", border: `1px solid ${domain.color}25` }}>
+                          <p className="text-xs font-medium mb-2" style={{ color: "#71717a" }}>
+                            D{i + 1}. {domainQList[i] ?? `Domain Question ${i + 1}`}
+                          </p>
+                          <p className="text-sm text-white leading-relaxed">{answer || <span className="italic text-zinc-600">No answer</span>}</p>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
 
               {/* Why Choose You */}
               {reg.why_choose_you && (

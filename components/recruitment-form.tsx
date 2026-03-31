@@ -2,9 +2,22 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronRight, ChevronLeft, User, Brain, MessageSquare, CheckCircle, Zap, Code, Terminal, Loader2 } from "lucide-react"
+import {
+  ChevronRight,
+  ChevronLeft,
+  User,
+  Brain,
+  MessageSquare,
+  CheckCircle,
+  Zap,
+  Code,
+  Terminal,
+  Loader2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+
+// ─── Domains ──────────────────────────────────────────────────────────────────
 
 const domains = [
   { id: "ai-ml", name: "AI / ML", icon: Brain, color: "#7c3aed" },
@@ -13,33 +26,88 @@ const domains = [
   { id: "graphics", name: "Graphics / Media", icon: Zap, color: "#f59e0b" },
 ]
 
+// ─── Questions ────────────────────────────────────────────────────────────────
+
+/** Common situational questions shown to ALL domains */
 const situationalQuestions = [
   {
     id: 1,
-    question: "You're working on a team project and a member consistently misses deadlines, affecting everyone's work. How do you handle this?",
-    placeholder: "Describe how you would approach this situation..."
+    question:
+      "You're working on a team project and a member consistently misses deadlines, affecting everyone's work. How do you handle this?",
+    placeholder: "Describe how you would approach this situation...",
   },
   {
     id: 2,
-    question: "You've been assigned a task using a technology you've never worked with before, and the deadline is tight. What's your approach?",
-    placeholder: "Explain your strategy for learning and delivering..."
+    question:
+      "You've been assigned a task using a technology you've never worked with before, and the deadline is tight. What's your approach?",
+    placeholder: "Explain your strategy for learning and delivering...",
   },
   {
     id: 3,
-    question: "During a club event, you notice a junior member struggling but hesitant to ask for help. What do you do?",
-    placeholder: "Describe how you would support them..."
+    question:
+      "During a club event, you notice a junior member struggling but hesitant to ask for help. What do you do?",
+    placeholder: "Describe how you would support them...",
   },
   {
     id: 4,
-    question: "You strongly disagree with a decision made by the club leadership about an upcoming project. How do you respond?",
-    placeholder: "Explain how you would handle this disagreement..."
+    question:
+      "You strongly disagree with a decision made by the club leadership about an upcoming project. How do you respond?",
+    placeholder: "Explain how you would handle this disagreement...",
   },
   {
     id: 5,
-    question: "You're leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What's your move?",
-    placeholder: "Describe how you would adapt..."
-  }
+    question:
+      "You're leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What's your move?",
+    placeholder: "Describe how you would adapt...",
+  },
 ]
+
+/**
+ * Domain-specific questions — keyed by domain id.
+ * IDs start from 101 to avoid collisions with situational question IDs.
+ */
+const domainQuestions: Record<
+  string,
+  Array<{ id: number; question: string; placeholder: string }>
+> = {
+  "web-dev": [
+    {
+      id: 101,
+      question: "What does HTML stand for, and what is its role in a webpage?",
+      placeholder: "Explain in your own words...",
+    },
+    {
+      id: 102,
+      question:
+        "What is the difference between HTML, CSS, and JavaScript? Explain in your own words.",
+      placeholder: "Describe each and how they work together...",
+    },
+    {
+      id: 103,
+      question: "What is the difference between a frontend and a backend developer?",
+      placeholder: "Explain the distinction...",
+    },
+    {
+      id: 104,
+      question: "What does 'responsive design' mean?",
+      placeholder: "Explain what makes a website responsive...",
+    },
+    {
+      id: 105,
+      question:
+        "You visit a website and the layout looks broken on your phone but fine on a laptop. What could be the reason?",
+      placeholder: "What might be causing this issue?",
+    },
+    {
+      id: 106,
+      question:
+        "Name any website you find visually appealing. What do you like about its design?",
+      placeholder: "Share the website and describe what stands out to you...",
+    },
+  ],
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FormData {
   fullName: string
@@ -51,14 +119,16 @@ interface FormData {
   experience: string
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function RecruitmentForm() {
   const [isMounted, setIsMounted] = useState(false)
   const [step, setStep] = useState(1)
-  
+
   useEffect(() => {
     setIsMounted(true)
   }, [])
-  
+
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     mobile: "",
@@ -66,24 +136,32 @@ export function RecruitmentForm() {
     domain: "",
     answers: {},
     whyChooseYou: "",
-    experience: ""
+    experience: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
   const [applicationId, setApplicationId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingCampusId, setIsCheckingCampusId] = useState(false)
-  
+
   if (!isMounted) return null
+
+  /** Returns the full list of questions for the currently selected domain */
+  const getActiveQuestions = () => {
+    const extra = domainQuestions[formData.domain] ?? []
+    return [...situationalQuestions, ...extra]
+  }
+
+  // ─── Validation ─────────────────────────────────────────────────────────────
 
   const validateStep1 = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {}
     if (!formData.fullName.trim()) newErrors.fullName = "Name is required"
-    if (!/^\d{10}$/.test(formData.mobile)) newErrors.mobile = "Enter valid 10-digit mobile number"
+    if (!/^\d{10}$/.test(formData.mobile))
+      newErrors.mobile = "Enter valid 10-digit mobile number"
     if (!formData.campusId.trim()) {
       newErrors.campusId = "Campus ID is required"
     } else {
-      // Check if campus ID already exists in database
       setIsCheckingCampusId(true)
       try {
         const supabase = createClient()
@@ -92,13 +170,11 @@ export function RecruitmentForm() {
           .select("campus_id")
           .eq("campus_id", formData.campusId.trim().toUpperCase())
           .single()
-        
         if (data) {
           newErrors.campusId = "This Campus ID has already submitted an application"
         }
-      } catch (error) {
+      } catch {
         console.warn("Database connection error: Configuration missing or connection failed.")
-        newErrors.campusId = "Database configuration missing or connection failed."
       } finally {
         setIsCheckingCampusId(false)
       }
@@ -108,9 +184,9 @@ export function RecruitmentForm() {
     return Object.keys(newErrors).length === 0
   }
 
-  const validateStep2 = () => {
+  const validateStep2 = (): boolean => {
     const newErrors: Record<string, string> = {}
-    situationalQuestions.forEach((q) => {
+    getActiveQuestions().forEach((q) => {
       const answer = formData.answers[q.id]?.trim()
       if (!answer || answer.length < 20) {
         newErrors[`q${q.id}`] = "Please provide a meaningful answer (min 20 characters)"
@@ -124,7 +200,7 @@ export function RecruitmentForm() {
     return true
   }
 
-  const validateStep3 = () => {
+  const validateStep3 = (): boolean => {
     const newErrors: Record<string, string> = {}
     if (formData.whyChooseYou.trim().length < 50) {
       newErrors.whyChooseYou = "Please write at least 50 characters"
@@ -133,6 +209,8 @@ export function RecruitmentForm() {
     return Object.keys(newErrors).length === 0
   }
 
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+
   const handleNext = async () => {
     if (step === 1) {
       const isValid = await validateStep1()
@@ -140,19 +218,17 @@ export function RecruitmentForm() {
     } else if (step === 2 && validateStep2()) {
       setStep(3)
     } else if (step === 3 && validateStep3()) {
-      handleSubmit()
+      await handleSubmit()
     }
   }
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    
     try {
       const supabase = createClient()
       const normalizedCampusId = formData.campusId.trim().toUpperCase()
       const id = `YT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-      
-      // Insert registration into database
+
       const { error } = await supabase.from("registrations").insert({
         application_id: id,
         campus_id: normalizedCampusId,
@@ -161,24 +237,22 @@ export function RecruitmentForm() {
         domain: formData.domain,
         answers: formData.answers,
         why_choose_you: formData.whyChooseYou.trim(),
-        experience: formData.experience.trim() || null
+        experience: formData.experience.trim() || null,
       })
-      
+
       if (error) {
-        // Check if it's a duplicate campus_id error
         if (error.code === "23505") {
           setStep(1)
           setErrors({ campusId: "This Campus ID has already submitted an application" })
           return
         }
-        // Handle other errors
         setErrors({ submit: "Something went wrong. Please try again." })
         return
       }
-      
+
       setApplicationId(id)
       setSubmitted(true)
-    } catch (error) {
+    } catch {
       console.warn("Submission error: Configuration missing or connection failed.")
       setErrors({ submit: "Database configuration missing or connection failed." })
     } finally {
@@ -186,9 +260,9 @@ export function RecruitmentForm() {
     }
   }
 
-  
-
   const progressWidth = `${(step / 3) * 100}%`
+
+  // ─── Success Screen ──────────────────────────────────────────────────────────
 
   if (submitted) {
     return (
@@ -222,6 +296,11 @@ export function RecruitmentForm() {
     )
   }
 
+  // ─── Form ────────────────────────────────────────────────────────────────────
+
+  const activeQuestions = getActiveQuestions()
+  const selectedDomain = domains.find((d) => d.id === formData.domain)
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Progress Bar */}
@@ -242,7 +321,7 @@ export function RecruitmentForm() {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* Step 1: Basic Info */}
+        {/* ── Step 1: Basic Info ── */}
         {step === 1 && (
           <motion.div
             key="step1"
@@ -262,6 +341,7 @@ export function RecruitmentForm() {
             </div>
 
             <div className="space-y-4">
+              {/* Full Name */}
               <div>
                 <label className="block text-sm font-mono text-foreground mb-2">Full Name</label>
                 <input
@@ -271,21 +351,32 @@ export function RecruitmentForm() {
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="Enter your full name"
                 />
-                {errors.fullName && <p className="text-destructive text-xs mt-1 font-mono">{errors.fullName}</p>}
+                {errors.fullName && (
+                  <p className="text-destructive text-xs mt-1 font-mono">{errors.fullName}</p>
+                )}
               </div>
 
+              {/* Mobile */}
               <div>
                 <label className="block text-sm font-mono text-foreground mb-2">Mobile Number</label>
                 <input
                   type="tel"
                   value={formData.mobile}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      mobile: e.target.value.replace(/\D/g, "").slice(0, 10),
+                    })
+                  }
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="10-digit mobile number"
                 />
-                {errors.mobile && <p className="text-destructive text-xs mt-1 font-mono">{errors.mobile}</p>}
+                {errors.mobile && (
+                  <p className="text-destructive text-xs mt-1 font-mono">{errors.mobile}</p>
+                )}
               </div>
 
+              {/* Campus ID */}
               <div>
                 <label className="block text-sm font-mono text-foreground mb-2">Campus ID</label>
                 <input
@@ -295,11 +386,16 @@ export function RecruitmentForm() {
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="Enter your campus ID"
                 />
-                {errors.campusId && <p className="text-destructive text-xs mt-1 font-mono">{errors.campusId}</p>}
+                {errors.campusId && (
+                  <p className="text-destructive text-xs mt-1 font-mono">{errors.campusId}</p>
+                )}
               </div>
 
+              {/* Domain Selection */}
               <div>
-                <label className="block text-sm font-mono text-foreground mb-3">Choose Your Domain</label>
+                <label className="block text-sm font-mono text-foreground mb-3">
+                  Choose Your Domain
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   {domains.map((domain) => {
                     const Icon = domain.icon
@@ -320,18 +416,22 @@ export function RecruitmentForm() {
                           style={{ backgroundColor: domain.color }}
                         />
                         <Icon className="w-6 h-6 mb-2" style={{ color: domain.color }} />
-                        <p className="font-sans font-semibold text-foreground text-sm">{domain.name}</p>
+                        <p className="font-sans font-semibold text-foreground text-sm">
+                          {domain.name}
+                        </p>
                       </button>
                     )
                   })}
                 </div>
-                {errors.domain && <p className="text-destructive text-xs mt-2 font-mono">{errors.domain}</p>}
+                {errors.domain && (
+                  <p className="text-destructive text-xs mt-2 font-mono">{errors.domain}</p>
+                )}
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* Step 2: Situational Questions */}
+        {/* ── Step 2: Assessment (Situational + Domain-specific) ── */}
         {step === 2 && (
           <motion.div
             key="step2"
@@ -340,14 +440,25 @@ export function RecruitmentForm() {
             exit={{ opacity: 0, x: -20 }}
             className="space-y-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-lg bg-[#7c3aed]/20 flex items-center justify-center">
                 <Brain className="w-5 h-5 text-[#7c3aed]" />
               </div>
               <div>
-                <h2 className="text-xl font-sans font-bold text-foreground">Situational Assessment</h2>
-                <p className="text-sm text-muted-foreground font-mono">How would you handle these scenarios?</p>
+                <h2 className="text-xl font-sans font-bold text-foreground">Assessment</h2>
+                <p className="text-sm text-muted-foreground font-mono">
+                  Answer all questions thoughtfully
+                </p>
               </div>
+            </div>
+
+            {/* Situational section label */}
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs font-mono font-semibold uppercase tracking-widest text-muted-foreground px-2">
+                Situational Questions
+              </span>
+              <div className="h-px flex-1 bg-border" />
             </div>
 
             <div className="space-y-6">
@@ -359,10 +470,12 @@ export function RecruitmentForm() {
                   </p>
                   <textarea
                     value={formData.answers[q.id] || ""}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      answers: { ...formData.answers, [q.id]: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        answers: { ...formData.answers, [q.id]: e.target.value },
+                      })
+                    }
                     onPaste={(e) => {
                       e.preventDefault()
                       alert("Pasting is disabled. Please type your answer.")
@@ -377,20 +490,97 @@ export function RecruitmentForm() {
                     {errors[`q${q.id}`] && (
                       <p className="text-destructive text-xs font-mono">{errors[`q${q.id}`]}</p>
                     )}
-                    <p className={cn(
-                      "text-xs font-mono ml-auto",
-                      (formData.answers[q.id]?.length || 0) >= 20 ? "text-[#10b981]" : "text-muted-foreground"
-                    )}>
+                    <p
+                      className={cn(
+                        "text-xs font-mono ml-auto",
+                        (formData.answers[q.id]?.length || 0) >= 20
+                          ? "text-[#10b981]"
+                          : "text-muted-foreground"
+                      )}
+                    >
                       {formData.answers[q.id]?.length || 0}/20 min
                     </p>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Domain-specific questions — only shown when questions exist for the domain */}
+            {(domainQuestions[formData.domain] ?? []).length > 0 && (
+              <>
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span
+                    className="text-xs font-mono font-semibold uppercase tracking-widest px-2"
+                    style={{ color: selectedDomain?.color ?? "#00d4ff" }}
+                  >
+                    {selectedDomain?.name} Questions
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <div className="space-y-6">
+                  {(domainQuestions[formData.domain] ?? []).map((q, qIndex) => (
+                    <div
+                      key={q.id}
+                      className="bg-card border rounded-lg p-5"
+                      style={{
+                        borderColor: `${selectedDomain?.color ?? "#00d4ff"}40`,
+                      }}
+                    >
+                      <p className="text-foreground font-mono text-sm mb-4 leading-relaxed">
+                        <span
+                          className="font-bold"
+                          style={{ color: selectedDomain?.color ?? "#00d4ff" }}
+                        >
+                          D{qIndex + 1}.
+                        </span>{" "}
+                        {q.question}
+                      </p>
+                      <textarea
+                        value={formData.answers[q.id] || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            answers: { ...formData.answers, [q.id]: e.target.value },
+                          })
+                        }
+                        onPaste={(e) => {
+                          e.preventDefault()
+                          alert("Pasting is disabled. Please type your answer.")
+                        }}
+                        onDrop={(e) => e.preventDefault()}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono text-sm transition-all resize-none"
+                        placeholder={q.placeholder}
+                        autoComplete="off"
+                      />
+                      <div className="flex justify-between mt-2">
+                        {errors[`q${q.id}`] && (
+                          <p className="text-destructive text-xs font-mono">
+                            {errors[`q${q.id}`]}
+                          </p>
+                        )}
+                        <p
+                          className={cn(
+                            "text-xs font-mono ml-auto",
+                            (formData.answers[q.id]?.length || 0) >= 20
+                              ? "text-[#10b981]"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {formData.answers[q.id]?.length || 0}/20 min
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </motion.div>
         )}
 
-        {/* Step 3: Personal Statement */}
+        {/* ── Step 3: Personal Statement ── */}
         {step === 3 && (
           <motion.div
             key="step3"
@@ -405,7 +595,9 @@ export function RecruitmentForm() {
               </div>
               <div>
                 <h2 className="text-xl font-sans font-bold text-foreground">Personal Statement</h2>
-                <p className="text-sm text-muted-foreground font-mono">Tell us why you&apos;re the one</p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  Tell us why you&apos;re the one
+                </p>
               </div>
             </div>
 
@@ -422,11 +614,17 @@ export function RecruitmentForm() {
                   placeholder="What makes you stand out? What will you bring to YENTECH? (min 50 characters)"
                 />
                 <div className="flex justify-between mt-1">
-                  {errors.whyChooseYou && <p className="text-destructive text-xs font-mono">{errors.whyChooseYou}</p>}
-                  <p className={cn(
-                    "text-xs font-mono ml-auto",
-                    formData.whyChooseYou.length >= 50 ? "text-[#10b981]" : "text-muted-foreground"
-                  )}>
+                  {errors.whyChooseYou && (
+                    <p className="text-destructive text-xs font-mono">{errors.whyChooseYou}</p>
+                  )}
+                  <p
+                    className={cn(
+                      "text-xs font-mono ml-auto",
+                      formData.whyChooseYou.length >= 50
+                        ? "text-[#10b981]"
+                        : "text-muted-foreground"
+                    )}
+                  >
                     {formData.whyChooseYou.length}/50 min
                   </p>
                 </div>
@@ -434,7 +632,8 @@ export function RecruitmentForm() {
 
               <div>
                 <label className="block text-sm font-mono text-foreground mb-2">
-                  Relevant Experience <span className="text-muted-foreground">(Optional)</span>
+                  Relevant Experience{" "}
+                  <span className="text-muted-foreground">(Optional)</span>
                 </label>
                 <textarea
                   value={formData.experience}
@@ -463,6 +662,11 @@ export function RecruitmentForm() {
         ) : (
           <div />
         )}
+
+        {errors.submit && (
+          <p className="text-destructive text-xs font-mono self-center">{errors.submit}</p>
+        )}
+
         <button
           type="button"
           onClick={handleNext}
