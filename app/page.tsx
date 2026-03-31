@@ -43,26 +43,26 @@ export default function Home() {
 
           {/* Logo & Title */}
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00d4ff] to-[#7c3aed] flex items-center justify-center">
-              <Cpu className="w-6 h-6 text-background" />
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#00d4ff] to-[#7c3aed] flex items-center justify-center">
+              <Cpu className="w-7 h-7 text-background" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-sans font-bold text-foreground tracking-tight">
+            <h1 className="text-5xl md:text-6xl font-sans font-bold text-foreground tracking-tight">
               YEN<span className="text-[#00d4ff]">TECH</span>
             </h1>
           </div>
 
           {/* Tagline */}
-          <p className="text-xl md:text-2xl font-sans font-semibold text-foreground mb-2">
+          <p className="text-2xl md:text-3xl font-sans font-semibold text-foreground mb-3">
             Join the Crew. Lead the Campus.
           </p>
-          <p className="text-muted-foreground font-mono text-sm max-w-md mx-auto">
+          <p className="text-muted-foreground font-mono text-base max-w-lg mx-auto">
             We&apos;re building the next generation of tech leaders. Are you ready to be one of them?
           </p>
         </header>
 
         {/* Recruitment Form Card */}
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-6 md:p-8 shadow-2xl shadow-[#00d4ff]/5">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-8 md:p-10 shadow-2xl shadow-[#00d4ff]/5">
             <div className="flex items-center gap-2 mb-6 pb-4 border-b border-border">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
