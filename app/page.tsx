@@ -1,5 +1,6 @@
 import { RecruitmentForm } from "@/components/recruitment-form"
-import { Cpu } from "lucide-react"
+import { Cpu, Lock } from "lucide-react"
+import Link from "next/link"
 
 export default function Home() {
   return (
@@ -76,10 +77,18 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <footer className="text-center mt-12 pb-8">
+        <footer className="text-center mt-12 pb-8 space-y-3">
           <p className="text-muted-foreground font-mono text-xs">
             &copy; {new Date().getFullYear()} YENTECH. Built with passion by students, for students.
           </p>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 text-xs font-mono transition-colors hover:opacity-80"
+            style={{ color: "#3f3f46" }}
+          >
+            <Lock className="w-3 h-3" />
+            admin panel
+          </Link>
         </footer>
       </div>
     </main>
