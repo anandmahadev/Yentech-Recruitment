@@ -41,7 +41,7 @@ interface Registration {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ADMIN_PASSWORD = "yentech2026"
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "yentech2026"
 
 const DOMAIN_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   "ai-ml": { label: "AI / ML", icon: Brain, color: "#7c3aed" },

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ChevronRight,
@@ -13,6 +13,7 @@ import {
   Code,
   Terminal,
   Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -28,7 +29,6 @@ const domains = [
 
 // ─── Questions ────────────────────────────────────────────────────────────────
 
-/** Common situational questions shown to ALL domains */
 const situationalQuestions = [
   {
     id: 1,
@@ -63,8 +63,7 @@ const situationalQuestions = [
 ]
 
 /**
- * Domain-specific questions — keyed by domain id.
- * IDs start from 101 to avoid collisions with situational question IDs.
+ * Domain-specific questions — IDs start from 101 to avoid collisions.
  */
 const domainQuestions: Record<
   string,
@@ -119,16 +118,77 @@ interface FormData {
   experience: string
 }
 
+// ─── Paste Warning Component ──────────────────────────────────────────────────
+
+function PasteWarning({ show }: { show: boolean }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="flex items-center gap-1.5 mt-1"
+        >
+          <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+          <p className="text-amber-400 text-xs font-mono">
+            Pasting is not allowed — please type your answer.
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ─── Textarea with paste guard ────────────────────────────────────────────────
+
+function GuardedTextarea({
+  value,
+  onChange,
+  rows = 3,
+  placeholder,
+  className,
+}: {
+  value: string
+  onChange: (val: string) => void
+  rows?: number
+  placeholder?: string
+  className?: string
+}) {
+  const [pasteBlocked, setPasteBlocked] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    setPasteBlocked(true)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setPasteBlocked(false), 3000)
+  }
+
+  return (
+    <>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onPaste={handlePaste}
+        onDrop={(e) => e.preventDefault()}
+        rows={rows}
+        className={className}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        maxLength={2000}
+      />
+      <PasteWarning show={pasteBlocked} />
+    </>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function RecruitmentForm() {
   const [isMounted, setIsMounted] = useState(false)
   const [step, setStep] = useState(1)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     mobile: "",
@@ -142,7 +202,11 @@ export function RecruitmentForm() {
   const [submitted, setSubmitted] = useState(false)
   const [applicationId, setApplicationId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isCheckingCampusId, setIsCheckingCampusId] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   if (!isMounted) return null
 
@@ -157,17 +221,35 @@ export function RecruitmentForm() {
   const validateStep1 = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.fullName.trim()) newErrors.fullName = "Name is required"
+    // Full name — letters and spaces only, 2–60 chars
+    const name = formData.fullName.trim()
+    if (!name) {
+      newErrors.fullName = "Name is required"
+    } else if (!/^[a-zA-Z\s'.]{2,60}$/.test(name)) {
+      newErrors.fullName = "Enter a valid full name (letters only, 2–60 chars)"
+    }
 
-    const mobileValid = /^\d{10}$/.test(formData.mobile)
-    if (!mobileValid) newErrors.mobile = "Enter valid 10-digit mobile number"
+    // Mobile — 10 digits, must not start with 0
+    const mobileValid = /^[6-9]\d{9}$/.test(formData.mobile)
+    if (!formData.mobile) {
+      newErrors.mobile = "Mobile number is required"
+    } else if (!mobileValid) {
+      newErrors.mobile = "Enter a valid 10-digit Indian mobile number"
+    }
 
-    if (!formData.campusId.trim()) newErrors.campusId = "Campus ID is required"
-    if (!formData.domain) newErrors.domain = "Select a domain"
+    // Campus ID
+    if (!formData.campusId.trim()) {
+      newErrors.campusId = "Campus ID is required"
+    }
 
-    // Only hit the DB if both mobile and campus ID look valid (saves unnecessary queries)
+    // Domain
+    if (!formData.domain) {
+      newErrors.domain = "Select a domain"
+    }
+
+    // DB duplicate checks — run both in parallel when both fields are syntactically valid
     if (mobileValid && formData.campusId.trim()) {
-      setIsCheckingCampusId(true)
+      setIsChecking(true)
       try {
         const supabase = createClient()
         const [campusCheck, mobileCheck] = await Promise.all([
@@ -189,9 +271,27 @@ export function RecruitmentForm() {
           newErrors.mobile = "This mobile number has already been used to apply"
         }
       } catch {
-        console.warn("Database connection error: Configuration missing or connection failed.")
+        console.warn("Database connection error.")
       } finally {
-        setIsCheckingCampusId(false)
+        setIsChecking(false)
+      }
+    } else if (mobileValid && !formData.campusId.trim()) {
+      // Campus ID missing — still check mobile independently
+      setIsChecking(true)
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from("registrations")
+          .select("mobile")
+          .eq("mobile", formData.mobile)
+          .maybeSingle()
+        if (data) {
+          newErrors.mobile = "This mobile number has already been used to apply"
+        }
+      } catch {
+        console.warn("Database connection error.")
+      } finally {
+        setIsChecking(false)
       }
     }
 
@@ -227,6 +327,9 @@ export function RecruitmentForm() {
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   const handleNext = async () => {
+    // Guard against double-tap / double-click
+    if (isSubmitting || isChecking) return
+
     if (step === 1) {
       const isValid = await validateStep1()
       if (isValid) setStep(2)
@@ -234,6 +337,13 @@ export function RecruitmentForm() {
       setStep(3)
     } else if (step === 3 && validateStep3()) {
       await handleSubmit()
+    }
+  }
+
+  const handleDomainChange = (domainId: string) => {
+    // Reset answers when domain changes to avoid stale domain-specific answers
+    if (domainId !== formData.domain) {
+      setFormData({ ...formData, domain: domainId, answers: {} })
     }
   }
 
@@ -257,6 +367,7 @@ export function RecruitmentForm() {
 
       if (error) {
         if (error.code === "23505") {
+          // Unique constraint — could be campus_id or could be mobile if we add that constraint
           setStep(1)
           setErrors({ campusId: "This Campus ID has already submitted an application" })
           return
@@ -268,14 +379,15 @@ export function RecruitmentForm() {
       setApplicationId(id)
       setSubmitted(true)
     } catch {
-      console.warn("Submission error: Configuration missing or connection failed.")
-      setErrors({ submit: "Database configuration missing or connection failed." })
+      console.warn("Submission error.")
+      setErrors({ submit: "Connection failed. Please check your internet and try again." })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const progressWidth = `${(step / 3) * 100}%`
+  const selectedDomain = domains.find((d) => d.id === formData.domain)
 
   // ─── Success Screen ──────────────────────────────────────────────────────────
 
@@ -311,10 +423,10 @@ export function RecruitmentForm() {
     )
   }
 
-  // ─── Form ────────────────────────────────────────────────────────────────────
+  const textareaClass =
+    "w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono text-sm transition-all resize-none"
 
-  const activeQuestions = getActiveQuestions()
-  const selectedDomain = domains.find((d) => d.id === formData.domain)
+  // ─── Form ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -358,13 +470,18 @@ export function RecruitmentForm() {
             <div className="space-y-4">
               {/* Full Name */}
               <div>
-                <label className="block text-sm font-mono text-foreground mb-2">Full Name</label>
+                <label htmlFor="fullName" className="block text-sm font-mono text-foreground mb-2">
+                  Full Name
+                </label>
                 <input
+                  id="fullName"
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="Enter your full name"
+                  autoComplete="off"
+                  maxLength={60}
                 />
                 {errors.fullName && (
                   <p className="text-destructive text-xs mt-1 font-mono">{errors.fullName}</p>
@@ -373,8 +490,11 @@ export function RecruitmentForm() {
 
               {/* Mobile */}
               <div>
-                <label className="block text-sm font-mono text-foreground mb-2">Mobile Number</label>
+                <label htmlFor="mobile" className="block text-sm font-mono text-foreground mb-2">
+                  Mobile Number
+                </label>
                 <input
+                  id="mobile"
                   type="tel"
                   value={formData.mobile}
                   onChange={(e) =>
@@ -385,6 +505,8 @@ export function RecruitmentForm() {
                   }
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="10-digit mobile number"
+                  autoComplete="off"
+                  maxLength={10}
                 />
                 {errors.mobile && (
                   <p className="text-destructive text-xs mt-1 font-mono">{errors.mobile}</p>
@@ -393,13 +515,18 @@ export function RecruitmentForm() {
 
               {/* Campus ID */}
               <div>
-                <label className="block text-sm font-mono text-foreground mb-2">Campus ID</label>
+                <label htmlFor="campusId" className="block text-sm font-mono text-foreground mb-2">
+                  Campus ID
+                </label>
                 <input
+                  id="campusId"
                   type="text"
                   value={formData.campusId}
                   onChange={(e) => setFormData({ ...formData, campusId: e.target.value })}
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all"
                   placeholder="Enter your campus ID"
+                  autoComplete="off"
+                  maxLength={30}
                 />
                 {errors.campusId && (
                   <p className="text-destructive text-xs mt-1 font-mono">{errors.campusId}</p>
@@ -418,7 +545,7 @@ export function RecruitmentForm() {
                       <button
                         key={domain.id}
                         type="button"
-                        onClick={() => setFormData({ ...formData, domain: domain.id })}
+                        onClick={() => handleDomainChange(domain.id)}
                         className={cn(
                           "relative p-4 rounded-lg border-2 transition-all duration-300 text-left group overflow-hidden",
                           formData.domain === domain.id
@@ -446,7 +573,7 @@ export function RecruitmentForm() {
           </motion.div>
         )}
 
-        {/* ── Step 2: Assessment (Situational + Domain-specific) ── */}
+        {/* ── Step 2: Assessment ── */}
         {step === 2 && (
           <motion.div
             key="step2"
@@ -483,23 +610,16 @@ export function RecruitmentForm() {
                     <span className="text-[#00d4ff] font-bold">Q{qIndex + 1}.</span>{" "}
                     {q.question}
                   </p>
-                  <textarea
+                  <GuardedTextarea
                     value={formData.answers[q.id] || ""}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        answers: { ...formData.answers, [q.id]: e.target.value },
+                        answers: { ...formData.answers, [q.id]: val },
                       })
                     }
-                    onPaste={(e) => {
-                      e.preventDefault()
-                      alert("Pasting is disabled. Please type your answer.")
-                    }}
-                    onDrop={(e) => e.preventDefault()}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono text-sm transition-all resize-none"
                     placeholder={q.placeholder}
-                    autoComplete="off"
+                    className={textareaClass}
                   />
                   <div className="flex justify-between mt-2">
                     {errors[`q${q.id}`] && (
@@ -520,7 +640,7 @@ export function RecruitmentForm() {
               ))}
             </div>
 
-            {/* Domain-specific questions — only shown when questions exist for the domain */}
+            {/* Domain-specific questions */}
             {(domainQuestions[formData.domain] ?? []).length > 0 && (
               <>
                 <div className="flex items-center gap-2 pt-2">
@@ -539,9 +659,7 @@ export function RecruitmentForm() {
                     <div
                       key={q.id}
                       className="bg-card border rounded-lg p-5"
-                      style={{
-                        borderColor: `${selectedDomain?.color ?? "#00d4ff"}40`,
-                      }}
+                      style={{ borderColor: `${selectedDomain?.color ?? "#00d4ff"}40` }}
                     >
                       <p className="text-foreground font-mono text-sm mb-4 leading-relaxed">
                         <span
@@ -552,23 +670,16 @@ export function RecruitmentForm() {
                         </span>{" "}
                         {q.question}
                       </p>
-                      <textarea
+                      <GuardedTextarea
                         value={formData.answers[q.id] || ""}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setFormData({
                             ...formData,
-                            answers: { ...formData.answers, [q.id]: e.target.value },
+                            answers: { ...formData.answers, [q.id]: val },
                           })
                         }
-                        onPaste={(e) => {
-                          e.preventDefault()
-                          alert("Pasting is disabled. Please type your answer.")
-                        }}
-                        onDrop={(e) => e.preventDefault()}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono text-sm transition-all resize-none"
                         placeholder={q.placeholder}
-                        autoComplete="off"
+                        className={textareaClass}
                       />
                       <div className="flex justify-between mt-2">
                         {errors[`q${q.id}`] && (
@@ -618,13 +729,18 @@ export function RecruitmentForm() {
 
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-mono text-foreground mb-2">
+                <label
+                  htmlFor="whyChooseYou"
+                  className="block text-sm font-mono text-foreground mb-2"
+                >
                   Why should we choose you? <span className="text-destructive">*</span>
                 </label>
                 <textarea
+                  id="whyChooseYou"
                   value={formData.whyChooseYou}
                   onChange={(e) => setFormData({ ...formData, whyChooseYou: e.target.value })}
                   rows={5}
+                  maxLength={3000}
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all resize-none"
                   placeholder="What makes you stand out? What will you bring to YENTECH? (min 50 characters)"
                 />
@@ -646,14 +762,19 @@ export function RecruitmentForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-mono text-foreground mb-2">
+                <label
+                  htmlFor="experience"
+                  className="block text-sm font-mono text-foreground mb-2"
+                >
                   Relevant Experience{" "}
                   <span className="text-muted-foreground">(Optional)</span>
                 </label>
                 <textarea
+                  id="experience"
                   value={formData.experience}
                   onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
                   rows={4}
+                  maxLength={2000}
                   className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/50 focus:border-[#00d4ff] text-foreground font-mono transition-all resize-none"
                   placeholder="Any projects, achievements, or experiences you'd like to share..."
                 />
@@ -669,7 +790,8 @@ export function RecruitmentForm() {
           <button
             type="button"
             onClick={() => setStep(step - 1)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-foreground font-mono text-sm hover:bg-secondary transition-colors"
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-foreground font-mono text-sm hover:bg-secondary transition-colors disabled:opacity-50"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
@@ -685,13 +807,13 @@ export function RecruitmentForm() {
         <button
           type="button"
           onClick={handleNext}
-          disabled={isSubmitting || isCheckingCampusId}
+          disabled={isSubmitting || isChecking}
           className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[#00d4ff] text-[#050508] font-sans font-semibold text-sm hover:bg-[#00d4ff]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting || isCheckingCampusId ? (
+          {isSubmitting || isChecking ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              {isCheckingCampusId ? "Checking..." : "Submitting..."}
+              {isChecking ? "Checking..." : "Submitting..."}
             </>
           ) : (
             <>
