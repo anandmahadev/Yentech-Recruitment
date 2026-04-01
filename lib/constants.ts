@@ -16,12 +16,12 @@ export const SITUATIONAL_QUESTIONS = [
 
 export const DOMAIN_SPECIFIC_QUESTIONS: Record<string, string[]> = {
   "web-dev": [
-    "What does HTML stand for, and what is its role in a webpage?",
-    "What is the difference between HTML, CSS, and JavaScript? Explain in your own words.",
-    "What is the difference between a frontend and a backend developer?",
-    "What does 'responsive design' mean?",
-    "You visit a website and the layout looks broken on your phone but fine on a laptop. What could be the reason?",
-    "Name any website you find visually appealing. What do you like about its design?",
+    "Explain the roles of HTML, CSS, and JavaScript in web development. Also describe semantic HTML and why it is important (with examples).",
+    "Explain the CSS box model and compare Flexbox and Grid. How do you use them to create responsive designs?",
+    "What is the difference between inline, internal, and external CSS? When would you use each? Also explain the difference between id and class.",
+    "What are variables and functions in JavaScript? Explain the differences between var, let, and const, and between == and ===.",
+    "What is the DOM and how does JavaScript interact with it? Explain event handling with an example. Also, what is the difference between id and class, and how are they used in CSS and JavaScript?",
+    "How do HTML forms work? Explain different input types and how JavaScript can be used to validate form data before submission. Also, what is the difference between GET and POST methods?",
   ],
   "ai-ml": [
     "What's something related to AI or technology that you taught yourself recently - not for a class, but just because you were curious? How did you go about learning it?",
