@@ -6,11 +6,9 @@ import { revalidatePath } from "next/cache"
 interface FormSubmissionData {
   fullName: string
   mobile: string
+  email: string
   campusId: string
   domain: string
-  answers: Record<string, string>
-  whyChooseYou: string
-  experience?: string
 }
 
 export async function submitRecruitmentFormAction(formData: FormSubmissionData) {
@@ -25,6 +23,11 @@ export async function submitRecruitmentFormAction(formData: FormSubmissionData) 
     return { success: false, error: "Invalid mobile number" }
   }
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+  if (!formData.email || !emailValid) {
+    return { success: false, error: "Invalid email address" }
+  }
+
   if (!formData.campusId.trim()) {
     return { success: false, error: "Campus ID is required" }
   }
@@ -33,24 +36,32 @@ export async function submitRecruitmentFormAction(formData: FormSubmissionData) 
     return { success: false, error: "Domain selection is required" }
   }
 
-  if (formData.whyChooseYou.trim().length < 50) {
-    return { success: false, error: "Personal statement too short" }
-  }
-
   try {
     const supabase = await createClient()
     
     // Check for duplicates on server as well
     const normalizedCampusId = formData.campusId.trim().toUpperCase()
+    const email = formData.email.trim().toLowerCase()
     
-    const { data: existing } = await supabase
+    // Check for duplicates on server with proper escaping
+    const { data: existing, error: checkError } = await supabase
       .from("registrations")
-      .select("id")
-      .or(`campus_id.eq.${normalizedCampusId},mobile.eq.${formData.mobile}`)
+      .select("id, campus_id, mobile, email")
+      .or(`campus_id.eq."${normalizedCampusId}",mobile.eq."${formData.mobile}",email.eq."${email}"`)
       .maybeSingle()
 
+    if (checkError) {
+      console.error("Duplicate check error:", checkError)
+      // We'll continue to try the insert as a fallback, which will trigger a DB unique constraint if it truly is a duplicate.
+    }
+
     if (existing) {
-      return { success: false, error: "Application already submitted with this Campus ID or Mobile number" }
+      let conflictField = "details";
+      if (existing.campus_id === normalizedCampusId) conflictField = "Campus ID";
+      else if (existing.mobile === formData.mobile) conflictField = "Mobile Number";
+      else if (existing.email === email) conflictField = "Email";
+      
+      return { success: false, error: `An application with this ${conflictField} already exists.` }
     }
 
     // Generate a strong ID
@@ -61,10 +72,10 @@ export async function submitRecruitmentFormAction(formData: FormSubmissionData) 
       campus_id: normalizedCampusId,
       full_name: name,
       mobile: formData.mobile,
+      email: email,
       domain: formData.domain,
-      answers: formData.answers,
-      why_choose_you: formData.whyChooseYou.trim(),
-      experience: formData.experience?.trim() || null,
+      status: 'registered',
+      answers: {},
     })
 
     if (insertError) {

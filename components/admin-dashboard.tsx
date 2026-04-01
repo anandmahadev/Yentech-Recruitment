@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Shield,
@@ -21,8 +20,17 @@ import {
   Terminal,
   Zap,
   X,
+  Link as LinkIcon,
+  Copy,
+  CheckCircle,
+  Clock,
+  ExternalLink,
+  Trash2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { adminLoginAction, adminLogoutAction, getAdminSessionAction, getRegistrationsAction } from "@/app/actions/auth-actions"
+import { generateTestLinkAction, getTestSessionsAction, deleteTestSessionAction } from "@/app/actions/admin-actions"
+import { toast } from "sonner"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +40,8 @@ interface Registration {
   campus_id: string
   full_name: string
   mobile: string
+  email: string
+  status: string
   domain: string
   answers: Record<string, string>
   why_choose_you: string
@@ -39,10 +49,25 @@ interface Registration {
   created_at: string
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+interface TestSession {
+  id: string
+  registration_id: string
+  link_id: string
+  domain: string
+  start_time: string | null
+  completed_at: string | null
+  expires_at: string
+  created_at: string
+  registrations?: {
+    full_name: string
+    email: string
+    campus_id: string
+    status: string
+    answers: Record<string, string>
+  }
+}
 
-// const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "yentech2026"
-import { adminLoginAction, adminLogoutAction, getAdminSessionAction, getRegistrationsAction } from "@/app/actions/auth-actions"
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DOMAIN_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   "ai-ml": { label: "AI / ML", icon: Brain, color: "#7c3aed" },
@@ -50,26 +75,6 @@ const DOMAIN_CONFIG: Record<string, { label: string; icon: React.ElementType; co
   cybersecurity: { label: "Cybersecurity", icon: Terminal, color: "#10b981" },
   graphics: { label: "Graphics / Media", icon: Zap, color: "#f59e0b" },
 }
-
-const SITUATIONAL_QUESTIONS = [
-  "You're working on a team project and a member consistently misses deadlines, affecting everyone's work. How do you handle this?",
-  "You've been assigned a task using a technology you've never worked with before, and the deadline is tight. What's your approach?",
-  "During a club event, you notice a junior member struggling but hesitant to ask for help. What do you do?",
-  "You strongly disagree with a decision made by the club leadership about an upcoming project. How do you respond?",
-  "You're leading a workshop and realize mid-session that your prepared content is too advanced for most attendees. What's your move?",
-]
-
-const DOMAIN_SPECIFIC_QUESTIONS: Record<string, string[]> = {
-  "web-dev": [
-    "What does HTML stand for, and what is its role in a webpage?",
-    "What is the difference between HTML, CSS, and JavaScript? Explain in your own words.",
-    "What is the difference between a frontend and a backend developer?",
-    "What does 'responsive design' mean?",
-    "You visit a website and the layout looks broken on your phone but fine on a laptop. What could be the reason?",
-    "Name any website you find visually appealing. What do you like about its design?",
-  ],
-}
-
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
@@ -100,7 +105,6 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="min-h-screen bg-[#050508] flex items-center justify-center p-4">
-      {/* Background grid */}
       <div
         className="fixed inset-0 opacity-10"
         style={{
@@ -109,12 +113,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           backgroundSize: "40px 40px",
         }}
       />
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative w-full max-w-md"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative w-full max-w-md">
         <div
           className="rounded-2xl border p-8"
           style={{
@@ -123,46 +122,25 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             boxShadow: "0 0 60px rgba(0, 212, 255, 0.05), 0 0 200px rgba(0, 212, 255, 0.02)",
           }}
         >
-          {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: "rgba(0, 212, 255, 0.1)",
-                border: "1px solid rgba(0, 212, 255, 0.3)",
-              }}
-            >
-              <Shield className="w-8 h-8" style={{ color: "#00d4ff" }} />
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#00d4ff]/10 border border-[#00d4ff]/30">
+              <Shield className="w-8 h-8 text-[#00d4ff]" />
             </div>
           </div>
-
           <h1 className="text-2xl font-bold text-center text-white mb-1">Admin Access</h1>
-          <p className="text-sm text-center mb-8" style={{ color: "#71717a" }}>
-            YENTECH Recruitment Dashboard
-          </p>
+          <p className="text-sm text-center mb-8 text-zinc-500">YENTECH Recruitment Dashboard</p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#a1a1aa" }}>
-                Admin Password
-              </label>
+              <label className="block text-sm font-medium mb-2 text-zinc-400">Admin Password</label>
               <div className="relative">
-                <Lock
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                  style={{ color: "#71717a" }}
-                />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter admin password"
-                  className="w-full pl-10 pr-10 py-3 rounded-lg text-white placeholder-zinc-600 outline-none transition-all"
-                  style={{
-                    background: "#0f0f18",
-                    border: error
-                      ? "1px solid rgba(239, 68, 68, 0.5)"
-                      : "1px solid rgba(39, 39, 42, 0.8)",
-                  }}
+                  className="w-full pl-10 pr-10 py-3 rounded-lg bg-[#0f0f18] border border-zinc-800 text-white placeholder-zinc-600 outline-none focus:border-[#00d4ff]/50 transition-all"
                   autoFocus
                 />
                 <button
@@ -173,35 +151,15 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {error && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xs"
-                  style={{ color: "#ef4444" }}
-                >
-                  {error}
-                </motion.p>
-              )}
+              {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
             </div>
-
             <button
               type="submit"
               disabled={isLoading || !password}
-              className="w-full py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "#00d4ff", color: "#050508" }}
+              className="w-full py-3 rounded-lg font-semibold text-sm bg-[#00d4ff] text-[#050508] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <Shield className="w-4 h-4" />
-                  Access Dashboard
-                </>
-              )}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+              Access Dashboard
             </button>
           </form>
         </div>
@@ -210,152 +168,123 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   )
 }
 
-// ─── Candidate Card ───────────────────────────────────────────────────────────
+// ─── Registration Row ────────────────────────────────────────────────────────
 
-function CandidateCard({ reg, index }: { reg: Registration; index: number }) {
+function RegistrationCard({ reg, onGenerateLink }: { reg: Registration; onGenerateLink: (id: string, domain: string) => void }) {
   const [expanded, setExpanded] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const domain = DOMAIN_CONFIG[reg.domain] ?? { label: reg.domain, icon: Code, color: "#00d4ff" }
   const DomainIcon = domain.icon
 
-  const answersArray = Object.entries(reg.answers || {}).sort(([a], [b]) => Number(a) - Number(b))
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    await onGenerateLink(reg.id, reg.domain)
+    setIsGenerating(false)
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="rounded-xl border overflow-hidden"
-      style={{ background: "#0a0a0f", borderColor: "rgba(39, 39, 42, 0.8)" }}
+      className="rounded-xl border border-white/5 bg-white/5 overflow-hidden"
     >
-      {/* Card Header */}
-      <div className="p-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          {/* Avatar */}
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold"
-            style={{ background: `${domain.color}18`, color: domain.color, border: `1px solid ${domain.color}40` }}
-          >
-            {reg.full_name.charAt(0).toUpperCase()}
+      <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-sm font-bold text-[#00d4ff]">
+            {reg.full_name.charAt(0)}
           </div>
-
-          <div className="min-w-0">
-            <p className="font-semibold text-white truncate">{reg.full_name}</p>
-            <div className="flex items-center gap-2 flex-wrap mt-0.5">
-              <span className="text-xs font-mono" style={{ color: "#71717a" }}>
-                {reg.campus_id}
-              </span>
-              <span className="text-xs" style={{ color: "#3f3f46" }}>·</span>
-              <span className="text-xs" style={{ color: "#71717a" }}>
-                {reg.mobile}
-              </span>
-            </div>
+          <div>
+            <h3 className="font-semibold text-white">{reg.full_name}</h3>
+            <p className="text-xs text-zinc-500 font-mono">{reg.email}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Domain Badge */}
-          <div
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
-            style={{ background: `${domain.color}15`, color: domain.color, border: `1px solid ${domain.color}30` }}
-          >
-            <DomainIcon className="w-3 h-3" />
-            {domain.label}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[10px] sm:text-xs">
+            <DomainIcon className="w-3 h-3" style={{ color: domain.color }} />
+            <span style={{ color: domain.color }}>{domain.label}</span>
+          </div>
+          
+          <div className={cn(
+            "px-2 py-1 rounded-md text-[10px] sm:text-xs font-mono border",
+            reg.status?.toLowerCase() === 'invited' 
+              ? "bg-green-500/10 border-green-500/20 text-green-400" 
+              : reg.status?.toLowerCase() === 'completed'
+              ? "bg-[#00d4ff]/10 border-[#00d4ff]/20 text-[#00d4ff]"
+              : reg.status?.toLowerCase() === 'started'
+              ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
+              : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+          )}>
+            {reg.status?.toUpperCase() || 'REGISTERED'}
           </div>
 
-          {/* App ID */}
-          <span className="hidden md:block text-xs font-mono px-2 py-1 rounded" style={{ background: "#1a1a24", color: "#71717a" }}>
-            {reg.application_id}
-          </span>
+          <div className="h-4 w-px bg-white/10 hidden sm:block" />
+
+          {reg.status?.toLowerCase() === 'completed' ? (
+            <div className="flex items-center gap-1 text-xs text-[#00d4ff] font-bold">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Test Completed
+            </div>
+          ) : (!reg.status || reg.status.toLowerCase() === 'registered') ? (
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00d4ff] text-[#050508] text-xs font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LinkIcon className="w-3 h-3" />}
+              Generate Link
+            </button>
+          ) : reg.status?.toLowerCase() === 'started' ? (
+            <div className="flex items-center gap-1 text-xs text-yellow-500 italic">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Test in Progress
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs text-green-500 italic">
+              <CheckCircle className="w-3 h-3" />
+              Link Generated
+            </div>
+          )}
 
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-            style={{ background: expanded ? "rgba(0,212,255,0.1)" : "#1a1a24", color: expanded ? "#00d4ff" : "#a1a1aa" }}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-500"
           >
-            {expanded ? (
-              <>Hide <ChevronUp className="w-3 h-3" /></>
-            ) : (
-              <>View <ChevronDown className="w-3 h-3" /></>
-            )}
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Expanded Answers */}
       <AnimatePresence>
         {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            style={{ overflow: "hidden" }}
-          >
-            <div className="px-5 pb-5 space-y-5 border-t" style={{ borderColor: "rgba(39,39,42,0.6)" }}>
-              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="rounded-lg p-3" style={{ background: "#0f0f18" }}>
-                  <p className="font-medium mb-1" style={{ color: "#71717a" }}>Submitted</p>
-                  <p className="text-white">{new Date(reg.created_at).toLocaleString("en-IN")}</p>
+          <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+            <div className="px-4 pb-4 pt-2 border-t border-white/5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <p className="text-zinc-500">Campus ID</p>
+                  <p className="font-mono text-white">{reg.campus_id}</p>
                 </div>
-                <div className="rounded-lg p-3" style={{ background: "#0f0f18" }}>
-                  <p className="font-medium mb-1" style={{ color: "#71717a" }}>Domain</p>
-                  <p style={{ color: domain.color }}>{domain.label}</p>
+                <div className="space-y-1">
+                  <p className="text-zinc-500">Mobile</p>
+                  <p className="font-mono text-white">{reg.mobile}</p>
                 </div>
-                {reg.experience && (
-                  <div className="rounded-lg p-3 md:col-span-2" style={{ background: "#0f0f18" }}>
-                    <p className="font-medium mb-1" style={{ color: "#71717a" }}>Prior Experience</p>
-                    <p className="text-white leading-relaxed">{reg.experience}</p>
-                  </div>
-                )}
+                <div className="space-y-1 md:col-span-2">
+                  <p className="text-zinc-500">Registered At</p>
+                  <p className="text-white">{new Date(reg.created_at).toLocaleString()}</p>
+                </div>
               </div>
 
-              {/* Situational Answers */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
-                  Situational Answers
-                </p>
-                {answersArray
-                  .filter(([key]) => Number(key) < 100)
-                  .map(([key, answer], i) => (
-                    <div key={key} className="rounded-lg p-4" style={{ background: "#0f0f18", border: "1px solid rgba(39,39,42,0.6)" }}>
-                      <p className="text-xs font-medium mb-2" style={{ color: "#71717a" }}>
-                        Q{i + 1}. {SITUATIONAL_QUESTIONS[i] ?? `Question ${Number(key)}`}
-                      </p>
-                      <p className="text-sm text-white leading-relaxed">{answer || <span className="italic text-zinc-600">No answer</span>}</p>
-                    </div>
-                  ))}
-              </div>
-
-              { /* Domain-Specific Answers */}
-              {answersArray.filter(([key]) => Number(key) >= 100).length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: domain.color }}>
-                    {domain.label} — Domain Questions
-                  </p>
-                  {answersArray
-                    .filter(([key]) => Number(key) >= 100)
-                    .map(([key, answer], i) => {
-                      const domainQList = DOMAIN_SPECIFIC_QUESTIONS[reg.domain] ?? []
-                      return (
-                        <div key={key} className="rounded-lg p-4" style={{ background: "#0f0f18", border: `1px solid ${domain.color}25` }}>
-                          <p className="text-xs font-medium mb-2" style={{ color: "#71717a" }}>
-                            D{i + 1}. {domainQList[i] ?? `Domain Question ${i + 1}`}
-                          </p>
-                          <p className="text-sm text-white leading-relaxed">{answer || <span className="italic text-zinc-600">No answer</span>}</p>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              {/* Why Choose You */}
-              {reg.why_choose_you && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
-                    Why Choose Me
-                  </p>
-                  <div className="rounded-lg p-4" style={{ background: "#0f0f18", border: "1px solid rgba(39,39,42,0.6)" }}>
-                    <p className="text-sm text-white leading-relaxed">{reg.why_choose_you}</p>
+              {/* Display Answers if completed */}
+              {reg.status === 'completed' && reg.answers && Object.keys(reg.answers).length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-white/5">
+                  <h4 className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-widest">Assessment Responses</h4>
+                  <div className="space-y-3">
+                    {Object.entries(reg.answers).map(([qId, answer]) => (
+                      <div key={qId} className="p-3 rounded-lg bg-white/5 border border-white/5">
+                        <p className="text-[10px] text-zinc-500 mb-1">Question ID: {qId}</p>
+                        <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{answer || "No response provided."}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -367,144 +296,283 @@ function CandidateCard({ reg, index }: { reg: Registration; index: number }) {
   )
 }
 
+// ─── Session Row ─────────────────────────────────────────────────────────────
+
+function SessionCard({ session, onDelete }: { session: TestSession; onDelete: (id: string, regId: string) => void }) {
+  const [isDeleting, setIsDeleting] = useState(false)
+  const isExpired = new Date(session.expires_at) < new Date()
+  const isCompleted = !!session.completed_at
+  const isStarted = !!session.start_time && !isCompleted
+
+  const [expanded, setExpanded] = useState(false)
+
+  const handleCopy = () => {
+    const url = `${window.location.origin}/test/${session.link_id}`
+    navigator.clipboard.writeText(url)
+    toast.success("Link copied to clipboard!")
+  }
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure? This will invalidate the link.")) return
+    setIsDeleting(true)
+    await onDelete(session.id, session.registration_id)
+    setIsDeleting(false)
+  }
+
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/5 overflow-hidden">
+      <div className="p-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-sm font-bold text-[#00d4ff]">
+                {(session.registrations?.full_name || "U").charAt(0)}
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">{session.registrations?.full_name || "Unknown Candidate"}</h3>
+                <p className="text-xs text-zinc-500 font-mono">{session.registrations?.email}</p>
+              </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={cn(
+              "px-2 py-1 rounded-md text-[10px] font-mono border",
+              isCompleted ? "bg-green-500/10 border-green-500/20 text-green-400" :
+              isStarted ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
+              isExpired ? "bg-red-500/10 border-red-500/20 text-red-400" :
+              "bg-blue-500/10 border-blue-500/20 text-blue-400"
+            )}>
+              {isCompleted ? "COMPLETED" : isStarted ? "IN PROGRESS" : isExpired ? "EXPIRED" : "PENDING"}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopy}
+                className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 transition-all"
+                title="Copy Test Link"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => window.open(`/test/${session.link_id}`, "_blank")}
+                className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 transition-all"
+                title="Preview Link"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 transition-all"
+                title="Delete Link"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="p-2 rounded-lg hover:bg-white/10 text-zinc-500"
+              >
+                {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px] text-zinc-500 font-mono">
+          <div>
+            <p className="text-zinc-600 mb-0.5 uppercase tracking-tighter">Domain</p>
+            <p className="text-zinc-400 font-bold">{session.domain?.toUpperCase()}</p>
+          </div>
+          <div>
+            <p className="text-zinc-600 mb-0.5 uppercase tracking-tighter">Expires</p>
+            <p className={cn(isExpired ? "text-red-400" : "text-zinc-400")}>
+              {new Date(session.expires_at).toLocaleDateString()}
+            </p>
+          </div>
+          {session.start_time && (
+            <div>
+              <p className="text-zinc-600 mb-0.5 uppercase tracking-tighter">Started At</p>
+              <p className="text-zinc-400">{new Date(session.start_time).toLocaleTimeString()}</p>
+            </div>
+          )}
+          {session.completed_at && (
+            <div>
+              <p className="text-zinc-600 mb-0.5 uppercase tracking-tighter">Completed At</p>
+              <p className="text-zinc-400">{new Date(session.completed_at).toLocaleTimeString()}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+            <div className="px-4 pb-4 pt-2 border-t border-white/5 space-y-4 bg-white/[0.02]">
+              {/* Profile Details (Minimal) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[10px]">
+                <div>
+                   <p className="text-zinc-600 uppercase mb-0.5">Campus ID</p>
+                   <p className="text-zinc-400 font-mono">{session.registrations?.campus_id}</p>
+                </div>
+                <div>
+                   <p className="text-zinc-600 uppercase mb-0.5">Link ID</p>
+                   <p className="text-zinc-400 font-mono">{session.link_id}</p>
+                </div>
+              </div>
+
+              {/* Responses Section */}
+              {isCompleted && session.registrations?.answers && Object.keys(session.registrations.answers).length > 0 ? (
+                <div className="space-y-3 pt-2 border-t border-white/5">
+                   <div className="flex items-center gap-2 mb-2">
+                     <CheckCircle className="w-3 h-3 text-[#00d4ff]" />
+                     <h4 className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-widest">Candidate Responses</h4>
+                   </div>
+                   <div className="space-y-3">
+                    {Object.entries(session.registrations.answers).map(([qId, answer]) => (
+                      <div key={qId} className="p-3 rounded-lg bg-black/20 border border-white/5">
+                        <p className="text-[9px] text-zinc-600 mb-1 font-mono uppercase">Question {qId}</p>
+                        <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{answer || "No response provided."}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : isCompleted ? (
+                <p className="text-[10px] text-zinc-500 italic py-2">Test marked as completed but no responses were recorded.</p>
+              ) : null}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
+  const [tab, setTab] = useState<"registrations" | "sessions">("registrations")
   const [registrations, setRegistrations] = useState<Registration[]>([])
+  const [sessions, setSessions] = useState<TestSession[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [domainFilter, setDomainFilter] = useState("all")
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
     try {
-      const data = await getRegistrationsAction()
-      setRegistrations(data ?? [])
+      if (tab === "registrations") {
+        const data = await getRegistrationsAction()
+        setRegistrations(data ?? [])
+      } else {
+        const data = await getTestSessionsAction()
+        setSessions((data as unknown as TestSession[]) ?? [])
+      }
     } catch (err) {
-      console.error("Admin fetch error:", err)
-      setError("Failed to load registrations. Check your session or connection.")
+      console.error("Fetch error:", err)
+      toast.error("Failed to load data.")
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [tab])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  const filtered = registrations.filter((r) => {
+  const handleGenerateLink = async (regId: string, domain: string) => {
+    const res = await generateTestLinkAction(regId, domain)
+    if (res.success) {
+      toast.success("Link generated successfully!")
+      fetchData()
+    } else {
+      toast.error(res.error || "Generation failed")
+    }
+  }
+
+  const handleDeleteSession = async (sessionId: string, regId: string) => {
+    const res = await deleteTestSessionAction(sessionId, regId)
+    if (res.success) {
+      toast.success("Session deleted")
+      fetchData()
+    } else {
+      toast.error(res.error || "Delete failed")
+    }
+  }
+
+  const filteredRegistrations = registrations.filter((r) => {
     const matchesSearch =
-      search === "" ||
       r.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      r.campus_id.toLowerCase().includes(search.toLowerCase()) ||
-      r.mobile.includes(search)
+      r.campus_id.toLowerCase().includes(search.toLowerCase())
     const matchesDomain = domainFilter === "all" || r.domain === domainFilter
     return matchesSearch && matchesDomain
   })
 
-  const domainCounts = registrations.reduce<Record<string, number>>((acc, r) => {
-    acc[r.domain] = (acc[r.domain] ?? 0) + 1
-    return acc
-  }, {})
-
   return (
     <div className="min-h-screen bg-[#050508] text-white">
-      {/* Background grid */}
-      <div
-        className="fixed inset-0 opacity-5 pointer-events-none"
+      <div className="fixed inset-0 opacity-5 pointer-events-none"
         style={{
-          backgroundImage:
-            "linear-gradient(rgba(0,212,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.3) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(rgba(0,212,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.3) 1px, transparent 1px)",
           backgroundSize: "40px 40px",
         }}
       />
 
       <div className="relative max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <header className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white">Recruitment Dashboard</h1>
-            <p className="text-sm mt-1" style={{ color: "#71717a" }}>
-              YENTECH · Admin Panel
-            </p>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Shield className="w-6 h-6 text-[#00d4ff]" />
+              YENTECH Admin
+            </h1>
+            <p className="text-xs text-zinc-500 font-mono">Recruitment Operations Dashboard</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={fetchData}
+            <button 
+              onClick={() => fetchData()} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:opacity-80 disabled:opacity-50"
-              style={{ background: "#1a1a24", color: "#a1a1aa" }}
+              className="p-2 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-[#00d4ff] transition-all disabled:opacity-50"
+              title="Refresh Data"
             >
-              <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
             </button>
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:opacity-80"
-              style={{ background: "#1a1a24", color: "#ef4444" }}
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
+            <button onClick={onLogout} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs border border-red-500/20">
+              <LogOut className="w-3.5 h-3.5" />
+              Logout
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
-          <div className="rounded-xl p-4" style={{ background: "#0a0a0f", border: "1px solid rgba(39,39,42,0.8)" }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4" style={{ color: "#00d4ff" }} />
-              <span className="text-xs font-medium" style={{ color: "#71717a" }}>Total</span>
-            </div>
-            <p className="text-2xl font-bold" style={{ color: "#00d4ff" }}>{registrations.length}</p>
-          </div>
-          {Object.entries(DOMAIN_CONFIG).map(([key, cfg]) => {
-            const Icon = cfg.icon
-            return (
-              <div key={key} className="rounded-xl p-4" style={{ background: "#0a0a0f", border: "1px solid rgba(39,39,42,0.8)" }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className="w-4 h-4" style={{ color: cfg.color }} />
-                  <span className="text-xs font-medium truncate" style={{ color: "#71717a" }}>{cfg.label}</span>
-                </div>
-                <p className="text-2xl font-bold" style={{ color: cfg.color }}>{domainCounts[key] ?? 0}</p>
-              </div>
-            )
-          })}
+        {/* Tabs */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10 mb-8 w-fit">
+          <button
+            onClick={() => setTab("registrations")}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", tab === "registrations" ? "bg-[#00d4ff] text-[#050508]" : "text-zinc-500 hover:text-white")}
+          >
+            Applications ({registrations.length})
+          </button>
+          <button
+            onClick={() => setTab("sessions")}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", tab === "sessions" ? "bg-[#00d4ff] text-[#050508]" : "text-zinc-500 hover:text-white")}
+          >
+            Test Sessions ({sessions.length})
+          </button>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#71717a" }} />
-            <input
-              type="text"
-              placeholder="Search by name, campus ID, or mobile..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-9 py-2.5 rounded-lg text-sm text-white placeholder-zinc-600 outline-none transition-all"
-              style={{ background: "#0a0a0f", border: "1px solid rgba(39,39,42,0.8)" }}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Domain Filter */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#71717a" }} />
+        {tab === "registrations" && (
+           <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search candidates..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm outline-none focus:border-[#00d4ff]/50"
+              />
+            </div>
             <select
               value={domainFilter}
               onChange={(e) => setDomainFilter(e.target.value)}
-              className="pl-9 pr-4 py-2.5 rounded-lg text-sm text-white outline-none cursor-pointer appearance-none"
-              style={{ background: "#0a0a0f", border: "1px solid rgba(39,39,42,0.8)", minWidth: "160px" }}
+              className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm outline-none"
             >
               <option value="all">All Domains</option>
               {Object.entries(DOMAIN_CONFIG).map(([key, cfg]) => (
@@ -512,44 +580,33 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Content */}
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#00d4ff" }} />
-            <p className="text-sm" style={{ color: "#71717a" }}>Loading applications...</p>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
-              <X className="w-6 h-6" style={{ color: "#ef4444" }} />
-            </div>
-            <p className="text-sm" style={{ color: "#ef4444" }}>{error}</p>
-            <button
-              onClick={fetchData}
-              className="px-4 py-2 rounded-lg text-sm transition-all hover:opacity-80"
-              style={{ background: "#1a1a24", color: "#a1a1aa" }}
-            >
-              Try Again
-            </button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <p className="text-sm" style={{ color: "#71717a" }}>
-              {registrations.length === 0 ? "No applications submitted yet." : "No results match your filters."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs mb-4" style={{ color: "#71717a" }}>
-              Showing {filtered.length} of {registrations.length} application{registrations.length !== 1 ? "s" : ""}
-            </p>
-            {filtered.map((reg, i) => (
-              <CandidateCard key={reg.id} reg={reg} index={i} />
-            ))}
-          </div>
         )}
+
+        {/* Data List */}
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="flex flex-col items-center py-20 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[#00d4ff]" />
+              <p className="text-zinc-500 text-sm">Synchronizing data...</p>
+            </div>
+          ) : tab === "registrations" ? (
+            filteredRegistrations.length > 0 ? (
+              filteredRegistrations.map(reg => (
+                <RegistrationCard key={reg.id} reg={reg} onGenerateLink={handleGenerateLink} />
+              ))
+            ) : (
+              <p className="text-center py-20 text-zinc-600 italic">No registrations found matching criteria.</p>
+            )
+          ) : (
+            sessions.length > 0 ? (
+              sessions.map(session => (
+                <SessionCard key={session.id} session={session} onDelete={handleDeleteSession} />
+              ))
+            ) : (
+              <p className="text-center py-20 text-zinc-600 italic">No active test sessions.</p>
+            )
+          )}
+        </div>
       </div>
     </div>
   )
