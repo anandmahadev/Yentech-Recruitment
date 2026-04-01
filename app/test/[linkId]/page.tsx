@@ -95,7 +95,8 @@ export default function AssessmentPage() {
     if (!sessionData) return []
     
     // Combine situational (0-99) and domain-specific (100+)
-    const sQs = SITUATIONAL_QUESTIONS.map((q, i) => ({ id: i, text: q, category: "situational" }))
+    const skipSituational = DOMAIN_CONFIG[sessionData.domain as keyof typeof DOMAIN_CONFIG]?.skipSituational
+    const sQs = skipSituational ? [] : SITUATIONAL_QUESTIONS.map((q, i) => ({ id: i, text: q, category: "situational" }))
     const dQs = (DOMAIN_SPECIFIC_QUESTIONS[sessionData.domain] || []).map((q, i) => ({
       id: 100 + i,
       text: q,

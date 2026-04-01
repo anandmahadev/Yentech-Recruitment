@@ -186,7 +186,8 @@ function AssessmentReportOverlay({
   const domain = DOMAIN_CONFIG[domainKey as keyof typeof DOMAIN_CONFIG] || { label: domainKey, color: "#00d4ff" }
   
   const questions = useMemo(() => {
-    const sQs = SITUATIONAL_QUESTIONS.map((q, i) => ({ id: i.toString(), text: q, category: "situational" }))
+    const skipSituational = DOMAIN_CONFIG[domainKey as keyof typeof DOMAIN_CONFIG]?.skipSituational
+    const sQs = skipSituational ? [] : SITUATIONAL_QUESTIONS.map((q, i) => ({ id: i.toString(), text: q, category: "situational" }))
     const dQs = (DOMAIN_SPECIFIC_QUESTIONS[domainKey] || []).map((q, i) => ({
       id: (100 + i).toString(),
       text: q,
