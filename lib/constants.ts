@@ -7,6 +7,12 @@ export const DOMAIN_CONFIG: Record<string, { label: string; icon: any; color: st
   graphics: { label: "Graphics / Media", icon: Zap, color: "#f59e0b", skipSituational: true },
 }
 
+/**
+ * Global toggle to enable/disable new candidate registrations.
+ * Set to false when the recruitment phase has ended.
+ */
+export const IS_REGISTRATION_OPEN = false;
+
 export const SITUATIONAL_QUESTIONS = [
   "You're working on a team project and a member consistently misses deadlines, affecting everyone's work. How do you handle this?",
   "You've been assigned a task using a technology you've never worked with before, and the deadline is tight. What's your approach?",

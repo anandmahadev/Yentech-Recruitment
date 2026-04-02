@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { submitRecruitmentFormAction } from "@/app/actions/form-actions"
+import { IS_REGISTRATION_OPEN } from "@/lib/constants"
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,49 @@ export function RecruitmentForm() {
   }, [])
 
   if (!isMounted) return null
+
+  // ─── Registration Closed Screen ─────────────────────────────────────────────
+
+  if (!IS_REGISTRATION_OPEN) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-xl mx-auto"
+      >
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 md:p-12 text-center shadow-2xl">
+          {/* Animated Background Gradient */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#00d4ff]/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-[#7c3aed]/10 rounded-full blur-3xl" />
+
+          <div className="relative z-10">
+            <div className="w-20 h-20 mx-auto mb-8 rounded-2xl bg-gradient-to-br from-[#00d4ff]/20 to-[#7c3aed]/20 flex items-center justify-center border border-white/10 shadow-inner">
+              <Zap className="w-10 h-10 text-[#00d4ff]" />
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-sans font-bold text-white mb-6 tracking-tight">
+              Registrations <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] to-[#7c3aed]">Closed</span>
+            </h2>
+
+            <div className="space-y-4 font-mono text-sm md:text-base text-gray-400 max-w-md mx-auto leading-relaxed">
+              <p>
+                Thank you for your interest in joining the YENTECH crew. 
+              </p>
+              <p>
+                The registration window for the current recruitment phase has officially closed as we have reached our capacity.
+              </p>
+            </div>
+
+            <div className="mt-12 pt-8 border-t border-white/5">
+              <p className="text-xs font-mono text-gray-500 uppercase tracking-widest">
+                Stay tuned for future opportunities
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
 
   // ─── Validation ─────────────────────────────────────────────────────────────
 

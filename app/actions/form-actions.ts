@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { IS_REGISTRATION_OPEN } from "@/lib/constants"
 
 interface FormSubmissionData {
   fullName: string
@@ -12,6 +13,10 @@ interface FormSubmissionData {
 }
 
 export async function submitRecruitmentFormAction(formData: FormSubmissionData) {
+  if (!IS_REGISTRATION_OPEN) {
+    return { success: false, error: "Registrations are currently closed. We've reached our capacity for this phase." }
+  }
+
   // 1. Server-side validation
   const name = formData.fullName.trim()
   if (!name || !/^[a-zA-Z\s'.]{2,60}$/.test(name)) {
