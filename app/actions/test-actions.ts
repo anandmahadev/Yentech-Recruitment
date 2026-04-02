@@ -128,7 +128,7 @@ export async function submitTestAnswersAction(linkId: string, answers: Record<st
   }
 
   // 3. Update registrations table
-  console.log(`Submitting answers for registration ${session.registration_id}...`)
+  console.log(`Submitting answers for registration ${session.registration_id}:`, JSON.stringify(answers))
   const { error: regError } = await supabase
     .from("registrations")
     .update({ 
@@ -164,11 +164,16 @@ export async function autoSaveTestAnswersAction(linkId: string, answers: Record<
   const supabase = await createClient()
 
   // 1. Get session details
+  console.log(`Auto-save request for linkId: ${linkId} with answers:`, JSON.stringify(answers))
   const { data: session } = await supabase
     .from("test_sessions")
     .select("registration_id, completed_at")
     .eq("link_id", linkId)
     .single()
+
+  console.log(`Auto-save session found:`, session)
+
+  console.log(`Auto-save: session for ${linkId} is:`, session)
 
   if (!session || session.completed_at) {
     return { success: false, error: "Session invalid or already completed" }
@@ -179,6 +184,8 @@ export async function autoSaveTestAnswersAction(linkId: string, answers: Record<
     .from("registrations")
     .update({ answers })
     .eq("id", session.registration_id)
+
+  console.log(`Auto-save update for ${session.registration_id} with:`, JSON.stringify(answers))
 
   if (error) {
     console.error("Auto-save error:", error)

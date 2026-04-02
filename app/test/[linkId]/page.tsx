@@ -64,6 +64,9 @@ export default function AssessmentPage() {
   const [showFullScreenOverlay, setShowFullScreenOverlay] = useState(false)
   const fullscreenViolationsRef = useRef(0)
   
+  // Sync status
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "saved" | "error">("idle")
+  
   // Refs for timer and synchronization
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -139,7 +142,10 @@ export default function AssessmentPage() {
     
     setState("submitting")
     // Always use Ref to get latest values during background events
-    const res = await submitTestAnswersAction(linkId as string, answersRef.current)
+    const currentAnswers = answersRef.current
+    console.log(`Final submission started for link ${linkId}. Answers:`, currentAnswers)
+
+    const res = await submitTestAnswersAction(linkId as string, currentAnswers)
     if (res.success) {
       setState("completed")
     } else {
@@ -155,7 +161,21 @@ export default function AssessmentPage() {
 
     const timer = setTimeout(async () => {
       // Background auto-save every 2 seconds of inactivity
-      await autoSaveTestAnswersAction(linkId as string, answersRef.current)
+      const currentAnswers = answersRef.current
+      console.log(`Auto-saving link ${linkId}... Answers:`, currentAnswers)
+      
+      setSyncStatus("syncing")
+      const res = await autoSaveTestAnswersAction(linkId as string, currentAnswers)
+      
+      if (!res.success) {
+        console.error(`Auto-save FAILED for link ${linkId}:`, res.error)
+        setSyncStatus("error")
+      } else {
+        console.log(`Auto-save SUCCESS for link ${linkId}`)
+        setSyncStatus("saved")
+        // Reset to idle after a few seconds
+        setTimeout(() => setSyncStatus("idle"), 3000)
+      }
     }, 2000)
 
     return () => clearTimeout(timer)
@@ -456,14 +476,44 @@ export default function AssessmentPage() {
             </div>
           </div>
 
-          <div className={cn(
-            "flex items-center gap-4 px-6 py-2 rounded-full border transition-all",
-            timeLeft < 60 ? "border-red-500/50 bg-red-500/10 text-red-500" : "border-[#00d4ff]/30 bg-[#00d4ff]/5 text-[#00d4ff]"
-          )}>
-            <Clock className={cn("w-5 h-5", timeLeft < 60 && "animate-pulse")} />
-            <span className="text-xl font-mono font-bold tracking-tighter">
-              {formatTime(timeLeft)}
-            </span>
+          <div className="flex items-center gap-6">
+            {/* Sync Progress Indicator */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-lg border border-white/5 bg-white/5">
+              {syncStatus === "syncing" && (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin text-[#00d4ff]" />
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Syncing Progress</span>
+                </>
+              )}
+              {syncStatus === "saved" && (
+                <>
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Progress Saved</span>
+                </>
+              )}
+              {syncStatus === "error" && (
+                <>
+                  <AlertTriangle className="w-3 h-3 text-red-500" />
+                  <span className="text-[10px] font-mono text-red-500 uppercase tracking-widest">Cloud Sync Error</span>
+                </>
+              )}
+              {syncStatus === "idle" && (
+                <>
+                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                  <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">Connection Stable</span>
+                </>
+              )}
+            </div>
+
+            <div className={cn(
+              "flex items-center gap-4 px-6 py-2 rounded-full border transition-all",
+              timeLeft < 60 ? "border-red-500/50 bg-red-500/10 text-red-500" : "border-[#00d4ff]/30 bg-[#00d4ff]/5 text-[#00d4ff]"
+            )}>
+              <Clock className={cn("w-5 h-5", timeLeft < 60 && "animate-pulse")} />
+              <span className="text-xl font-mono font-bold tracking-tighter">
+                {formatTime(timeLeft)}
+              </span>
+            </div>
           </div>
 
           <button onClick={handleSubmit} disabled={state === "submitting"} className="px-6 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-white hover:bg-white/10 transition-all disabled:opacity-50">
