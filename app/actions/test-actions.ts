@@ -16,7 +16,8 @@ export async function verifyTestLinkAction(linkId: string) {
       *,
       registrations (
         full_name,
-        domain
+        domain,
+        answers
       )
     `)
     .eq("link_id", linkId)
@@ -153,5 +154,36 @@ export async function submitTestAnswersAction(linkId: string, answers: Record<st
 
   console.log(`Successfully submitted test for registration ${session.registration_id}`)
   revalidatePath("/admin")
+  return { success: true }
+}
+
+/**
+ * Auto-saves partial test answers without closing the session
+ */
+export async function autoSaveTestAnswersAction(linkId: string, answers: Record<string, string>) {
+  const supabase = await createClient()
+
+  // 1. Get session details
+  const { data: session } = await supabase
+    .from("test_sessions")
+    .select("registration_id, completed_at")
+    .eq("link_id", linkId)
+    .single()
+
+  if (!session || session.completed_at) {
+    return { success: false, error: "Session invalid or already completed" }
+  }
+
+  // 2. Update registration answers
+  const { error } = await supabase
+    .from("registrations")
+    .update({ answers })
+    .eq("id", session.registration_id)
+
+  if (error) {
+    console.error("Auto-save error:", error)
+    return { success: false, error: error.message }
+  }
+
   return { success: true }
 }

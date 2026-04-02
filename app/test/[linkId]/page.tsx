@@ -27,7 +27,8 @@ import {
 import { 
   verifyTestLinkAction, 
   startTestSessionAction, 
-  submitTestAnswersAction 
+  submitTestAnswersAction,
+  autoSaveTestAnswersAction
 } from "@/app/actions/test-actions"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -76,6 +77,11 @@ export default function AssessmentPage() {
         setSessionData(res.session)
         if (res.alreadyStarted) {
           setTimeLeft(res.remainingSeconds!)
+          // Restore previous answers if they exist
+          if (res.session.registrations?.answers) {
+            setAnswers(res.session.registrations.answers)
+            answersRef.current = res.session.registrations.answers
+          }
           setState("running")
         } else {
           setState("welcome")
@@ -141,6 +147,19 @@ export default function AssessmentPage() {
       setErrorMessage(res.error || "Submission failed.")
     }
   }, [linkId, state])
+
+  // ─── Auto-save Logic ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (state !== "running") return
+
+    const timer = setTimeout(async () => {
+      // Background auto-save every 2 seconds of inactivity
+      await autoSaveTestAnswersAction(linkId as string, answersRef.current)
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [answers, state, linkId])
 
   // ─── Timer Logic ───────────────────────────────────────────────────────────
 
